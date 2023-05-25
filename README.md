@@ -9,10 +9,10 @@ After cloning this repository before running the <code>main.py</code> file it's 
 - You are in the same network of the Optitrack system which you want to stream informations from
 - On the Optitrack system the streaming of data is turned on
 - You have set up the parameters in the <code>modules/Settings.py</code> file (such as the client address, the server addres, ...) (p.s. if these parameters are not set the program won't start)
-- You're websocket server is up and running (otherwise it will shut down immediately)
+- The websocket server is up and running (otherwise the program will shut down immediately)
 
 If you are running the program with a manager (e.g. <code>supervisord</code>) is suggested to set the variable <code>LOGGING_ON_STDOUT</code> in the file <code>Settings.py</code> while is recomended to put it to true if you are running it in a command windows. <br>
-The logging on the stdout (controller with the variable <code>LOGGING_ON_STDOUT</code>) is set to a logging level of DEBUG while the logging on the file is set to a logging level of INFO.
+The logging on the stdout (controller with the variable <code>LOGGING_ON_STDOUT</code>) is set to a logging level of DEBUG while the logging on the file is set to a logging level of INFO. <br>
 
 ## Adapt the code for you work
 In this case the code has been adapted to send only specific data (frame_number, timestamp and labeled_marked_data). <br>
