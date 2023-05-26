@@ -330,7 +330,6 @@ class LabeledMarker:
         if str(type(size)) == "<class 'tuple'>":
             self.size=size[0]
 
-
     def __decode_marker_id(self):
         model_id = self.id_num >> 16
         marker_id = self.id_num & 0x0000ffff
@@ -341,6 +340,12 @@ class LabeledMarker:
         point_cloud_solved = ( self.param & 0x02 ) != 0
         model_solved = ( self.param & 0x04 ) != 0
         return occluded,point_cloud_solved, model_solved
+
+    def get_info(self):
+        return {
+            'position': self.pos,
+            'marker-id': self.id_num,
+        }
 
     def get_as_string(self, tab_str, level):
         out_tab_str = get_tab_str(tab_str, level)
@@ -366,6 +371,9 @@ class LabeledMarkerData:
     def add_labeled_marker(self, labeled_marker):
         self.labeled_marker_list.append(copy.deepcopy(labeled_marker))
         return len(self.labeled_marker_list)
+
+    def get_labeled_markers_list(self):
+        return self.labeled_marker_list
 
     def get_labeled_marker_count(self):
         return len(self.labeled_marker_list)

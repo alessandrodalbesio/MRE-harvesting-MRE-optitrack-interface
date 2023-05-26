@@ -104,9 +104,6 @@ class NatNetClientRaspberry:
         # Websocket port
         self.websocket_server_port = 9000
 
-        # Sleep time after websocket exception
-        self.sleep_time_after_websocket_exception = 5
-
         # Define if you want to use multicast or unicast
         self.use_multicast = True
 
@@ -706,9 +703,12 @@ class NatNetClientRaspberry:
 
     # Unpack data from a motion capture frame message
     def __unpack_mocap_data( self, data : bytes, packet_size, major, minor):
-        def makeDataReadyForWebsocket(data):
-            # This function manage the data in a way such that it can be send to the websocket
-            return data
+        def makeDataReadyForWebsocket(data: MoCapData):
+            markers = data.get_labeled_marker_data().get_labeled_markers_list()
+            return_data = []
+            for marker in markers:
+                return_data.append(marker.get_info())
+            return return_data
         
 
         mocap_data = MoCapData.MoCapData()
@@ -760,11 +760,11 @@ class NatNetClientRaspberry:
 
         # Define returning data
         timestamp = frame_suffix_data.timestamp
-        return {
+        return json.dumps({
             "frame_number": frame_number,
             "timestamp": timestamp,
             "mocap_data": makeDataReadyForWebsocket(mocap_data)
-        }
+        })
 
     # Unpack a marker set description packet
     def __unpack_marker_set_description( self, data, major, minor):
@@ -1167,40 +1167,29 @@ class NatNetClientRaspberry:
         # Define the data buffer
         data=bytearray(0)
         recv_buffer_size=64*1024 # 64k buffer size
-        try:
+        #try:
             # Connect with the websocket server
-            with connect("ws://" + str(self.websocket_server_address) + ":" + str(self.websocket_server_port)) as websocket:
-                # Send a ping message to the websocket server
-                websocket_message = json.dumps({'category': 'optitrack', 'type': 'ping'})
-                websocket.send(websocket_message)            
-                while not stop():
-
-                    # Wait for the input from the websocket
-                    try:
-                            data, addr = in_socket.recvfrom( recv_buffer_size )
-                    except socket.error as msg:
-                        if not stop():
-                            print("ERROR: data socket access error occurred:\n  %s" %msg)
-                            return 1
-                    except  socket.herror:
-                            print("ERROR: data socket access herror occurred")
-                            #return 2
-                    except  socket.gaierror:
-                            print("ERROR: data socket access gaierror occurred")
-                            #return 3
-                    except  socket.timeout:
-                            #if self.use_multicast:
-                            print("ERROR: data socket access timeout occurred. Server not responding")
-                            #return 4
+        with connect("ws://" + str(self.websocket_server_address) + ":" + str(self.websocket_server_port)) as websocket:
+                # Send a ping message to the websocket server        
+            while not stop():
+                # Wait for the input from the websocket
+                try:
+                    data, addr = in_socket.recvfrom( recv_buffer_size )
+                except socket.error as msg:
+                    if not stop():
+                        print("ERROR: data socket access error occurred:\n  %s" %msg)
+                        return 1
 
                     # If the data is not null send it to the websocket                
-                    if len( data ) > 0 :
-                        processed_data = self.__process_message( data )
-                        data = bytearray(0)
-            return 0
-        except Exception as e:
-            self.logger.error("ERROR: websocket error occurred:\n  %s" %e)
-            self.force_shutdown = True
+                if len( data ) > 0 :
+                    processed_data = self.__process_message( data )
+                    print(processed_data)
+                    websocket.send(json.dumps({'type': 'optitrack-data', 'data': processed_data}))
+                    data = bytearray(0)
+        return 0
+        #except Exception as e:
+        #    self.logger.error("ERROR: websocket error occurred:\n  %s" %e)
+        #    self.force_shutdown = True
     
     def __process_message( self, data : bytes):
         # Get usefull informations
