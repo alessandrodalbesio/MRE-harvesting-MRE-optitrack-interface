@@ -790,7 +790,7 @@ class NatNetClientRaspberry:
             "frame_number": frame_number,
             "timestamp": timestamp,
             "mocap_data": makeDataReadyForWebsocket(mocap_data)
-        }
+        })
 
     # Unpack a marker set description packet
     def __unpack_marker_set_description( self, data, major, minor):

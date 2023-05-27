@@ -375,6 +375,9 @@ class LabeledMarkerData:
         self.labeled_marker_list.append(copy.deepcopy(labeled_marker))
         return len(self.labeled_marker_list)
 
+    def get_labeled_markers_list(self):
+        return self.labeled_marker_list
+
     def get_labeled_marker_count(self):
         return len(self.labeled_marker_list)
 
