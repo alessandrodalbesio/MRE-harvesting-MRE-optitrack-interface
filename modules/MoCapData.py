@@ -330,7 +330,6 @@ class LabeledMarker:
         if str(type(size)) == "<class 'tuple'>":
             self.size=size[0]
 
-
     def __decode_marker_id(self):
         model_id = self.id_num >> 16
         marker_id = self.id_num & 0x0000ffff
@@ -341,6 +340,15 @@ class LabeledMarker:
         point_cloud_solved = ( self.param & 0x02 ) != 0
         model_solved = ( self.param & 0x04 ) != 0
         return occluded,point_cloud_solved, model_solved
+
+    def get_marker(self):
+        return {
+            'id': self.id_num,
+            'pos': self.pos,
+            'size': self.size,
+            'param': self.param,
+            'residual': self.residual
+        }
 
     def get_as_string(self, tab_str, level):
         out_tab_str = get_tab_str(tab_str, level)
@@ -369,6 +377,9 @@ class LabeledMarkerData:
 
     def get_labeled_marker_count(self):
         return len(self.labeled_marker_list)
+
+    def get_labeled_markers(self):
+        return self.labeled_marker_list
 
     def get_as_string(self, tab_str = "  ", level = 0):
         out_tab_str = get_tab_str(tab_str, level)
@@ -586,11 +597,11 @@ class MoCapData:
     def set_skeleton_data(self, new_skeleton_data):
         self.skeleton_data = new_skeleton_data
 
+    def get_labeled_marker_data(self):
+        return self.labeled_marker_data
+
     def set_labeled_marker_data(self, new_labeled_marker_data):
         self.labeled_marker_data = new_labeled_marker_data
-
-    def get_labeled_marker_data(self):
-        return self.labeled_marker_data        
 
     def set_force_plate_data(self, new_force_plate_data):
         self.force_plate_data = new_force_plate_data

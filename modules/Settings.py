@@ -1,11 +1,10 @@
 # Optitrack settings
-CLIENT_ADDRESS = None
-OPTITRACK_ADDRESS = None
-USE_MULTICAST = None
+CLIENT_ADDRESS = "10.99.2.243"
+OPTITRACK_ADDRESS = "10.99.2.4"
+USE_MULTICAST = True
 
 # Websocket settings
-WEBSOCKET_SERVER_ADDRESS = None
-WEBSOCKET_SERVER_PORT = None
+WEBSOCKET_SERVER_ADDRESS = "virtualenv.epfl.ch/ws"
 
 # Logging settings
 LOGGING_ON_STDOUT = True
@@ -14,5 +13,5 @@ LOGGING_ON_STDOUT = True
 PROGRAM_SLEEP_TIME = 1
 PROGRAM_LOOP_SLEEP_TIME = 1
 
-if CLIENT_ADDRESS is None or OPTITRACK_ADDRESS is None or USE_MULTICAST is None or WEBSOCKET_SERVER_ADDRESS is None or WEBSOCKET_SERVER_PORT is None:
+if CLIENT_ADDRESS is None or OPTITRACK_ADDRESS is None or USE_MULTICAST is None or WEBSOCKET_SERVER_ADDRESS is None:
     raise ValueError("Please set all the settings in Settings.py")

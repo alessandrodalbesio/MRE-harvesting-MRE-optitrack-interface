@@ -18,8 +18,7 @@ if __name__ == '__main__':
         streaming_client.set_client_address(CLIENT_ADDRESS)
         streaming_client.set_server_address(OPTITRACK_ADDRESS)
         streaming_client.set_use_multicast(USE_MULTICAST)
-        streaming_client.set_websocket_server_address(WEBSOCKET_SERVER_ADDRESS)
-        streaming_client.set_websocket_server_port(WEBSOCKET_SERVER_PORT)
+        streaming_client.set_websocket_connection_url(WEBSOCKET_SERVER_ADDRESS, is_DNS=True)
         streaming_client.set_logger(loggerManager)
 
         # Start up the streaming client
@@ -40,9 +39,6 @@ if __name__ == '__main__':
         else:
             loggerManager.debug("Streaming client connected")
         time.sleep(PROGRAM_SLEEP_TIME)
-
-        # Print the configuration of the streaming client
-        streaming_client.print_configuration()
     except Exception as e:
         logger.error("An exception occurred while initializing the streaming client. \n" + traceback.format_exc())
         streaming_client.shutdown()
@@ -54,7 +50,7 @@ if __name__ == '__main__':
     ##### Run the streaming client loop #####
     exit_code = 0
     try:
-        while streaming_client.need_to_force_shutdown() is False:
+        while True:
             time.sleep(PROGRAM_LOOP_SLEEP_TIME)
     except KeyboardInterrupt:
         pass

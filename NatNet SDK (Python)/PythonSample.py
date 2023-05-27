@@ -152,8 +152,8 @@ def my_parse_args(arg_list, args_dict):
 if __name__ == "__main__":
 
     optionsDict = {}
-    optionsDict["clientAddress"] = "127.0.0.1"
-    optionsDict["serverAddress"] = "127.0.0.1"
+    optionsDict["clientAddress"] = "10.99.2.243"
+    optionsDict["serverAddress"] = "10.9.2.4"
     optionsDict["use_multicast"] = True
 
     # This will create a new NatNet client

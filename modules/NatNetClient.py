@@ -52,18 +52,6 @@ NNIntValue = struct.Struct( '<I')
 FPCalMatrixRow = struct.Struct( '<ffffffffffff' )
 FPCorners      = struct.Struct( '<ffffffffffff')
 
-# Logging functions
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
 # Definition of the personalized NatNetClient class
 class NatNetClientRaspberry:   
     # Client/server message ids
@@ -89,9 +77,6 @@ class NatNetClientRaspberry:
         # Change this value to the IP address of your local network interface
         self.local_ip_address = "127.0.0.1"
 
-        # Change this value to the IP address of the Websocket server
-        self.websocket_server_address = "127.0.0.1"
-
         # This should match the multicast address listed in Motive's streaming settings.
         self.multicast_address = "239.255.42.99"
 
@@ -100,12 +85,6 @@ class NatNetClientRaspberry:
 
         # NatNet Data channel
         self.data_port = 1511
-
-        # Websocket port
-        self.websocket_server_port = 9000
-
-        # Sleep time after websocket exception
-        self.sleep_time_after_websocket_exception = 5
 
         # Define if you want to use multicast or unicast
         self.use_multicast = True
@@ -139,9 +118,11 @@ class NatNetClientRaspberry:
 
         self.stop_threads=False
 
+        # Logger
         self.logger = None
 
-        self.force_shutdown = False
+        # Define the websocket connection url
+        self.websocket_connection_url = ""
 
     def need_to_force_shutdown(self):
         return self.force_shutdown
@@ -165,19 +146,16 @@ class NatNetClientRaspberry:
     def get_server_address(self):
         return self.server_ip_address
 
-    def set_websocket_server_address(self, address):
+    def set_websocket_connection_url(self, address, is_DNS=False, port=8080):
+        """ Set the websocket connection url (don't define the ws:// part because it's added automatically)"""
         if not self.__is_locked:
-            self.websocket_server_address = address
+            if is_DNS:
+                self.websocket_connection_url = "ws://" + address
+            else:
+                self.websocket_connection_url = "ws://" + address + ":" + str(port)
 
-    def get_websocket_server_address(self):
-        return self.websocket_server_address
-
-    def set_websocket_server_port(self, port):
-        if not self.__is_locked:
-            self.websocket_server_port = port
-
-    def get_websocket_server_port(self):
-        return self.websocket_server_port
+    def get_websocket_connection_url(self):
+        return self.websocket_connection_url
 
     def set_logger(self, logger):
         if not self.__is_locked:
@@ -193,7 +171,9 @@ class NatNetClientRaspberry:
     def set_nat_net_version(self, major, minor):
         """checks to see if stream version can change, then changes it with position reset"""
         return_code = -1
-        if self.__can_change_bitstream_version and (major != self.__nat_net_requested_version[0]) and (minor != self.__nat_net_requested_version[1]):
+        if self.__can_change_bitstream_version and \
+            (major != self.__nat_net_requested_version[0]) and\
+            (minor != self.__nat_net_requested_version[1]):
             sz_command = "Bitstream,%1.1d.%1.1d"%(major, minor)
             return_code = self.send_command(sz_command)
             if return_code >=0:
@@ -201,12 +181,22 @@ class NatNetClientRaspberry:
                 self.__nat_net_requested_version[1] = minor
                 self.__nat_net_requested_version[2] = 0
                 self.__nat_net_requested_version[3] = 0
-                self.logger.debug("changing bitstream MAIN")
+                print("changing bitstream MAIN")
+                # get original output state
+                #print_results = self.get_print_results()
+                #turn off output
+                #self.set_print_results(False)
+                # force frame send and play reset
                 self.send_command("TimelinePlay")
                 time.sleep(0.1)
-                tmpCommands=["TimelinePlay", "TimelineStop", "SetPlaybackCurrentFrame,0", "TimelineStop"]
+                tmpCommands=["TimelinePlay",
+                    "TimelineStop",
+                    "SetPlaybackCurrentFrame,0",
+                    "TimelineStop"]
                 self.send_commands(tmpCommands,False)
                 time.sleep(2)
+                #reset to original output state
+                #self.set_print_results(print_results)
         return return_code
 
 
@@ -249,38 +239,44 @@ class NatNetClientRaspberry:
             try:
                 result.bind( ('', 0) )
             except socket.error as msg:
-                self.logger.error("ERROR: command socket error occurred:\n%s" %msg)
-                self.logger.error("Check Motive/Server mode requested mode agreement.  You requested Multicast ")
+                print("ERROR: command socket error occurred:\n%s" %msg)
+                print("Check Motive/Server mode requested mode agreement.  You requested Multicast ")
                 result = None
             except  socket.herror:
-                self.logger.error("ERROR: command socket herror occurred")
+                print("ERROR: command socket herror occurred")
                 result = None
             except  socket.gaierror:
-                self.logger.error("ERROR: command socket gaierror occurred")
+                print("ERROR: command socket gaierror occurred")
                 result = None
             except  socket.timeout:
-                self.logger.error("ERROR: command socket timeout occurred. Server not responding")
-                result = None      
-
-            if result is not None:      
-                # set to broadcast mode
-                result.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                # set timeout to allow for keep alive messages
-                result.settimeout(2.0)
+                print("ERROR: command socket timeout occurred. Server not responding")
+                result = None
+            # set to broadcast mode
+            result.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            # set timeout to allow for keep alive messages
+            result.settimeout(2.0)
         else:
             # Unicast case
             result = socket.socket( socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
             try:
                 result.bind( (self.local_ip_address, 0) )
             except socket.error as msg:
-                self.logger.error("ERROR: command socket error occurred:\n%s" %msg)
-                self.logger.error("Check Motive/Server mode requested mode agreement.  You requested Unicast ")
+                print("ERROR: command socket error occurred:\n%s" %msg)
+                print("Check Motive/Server mode requested mode agreement.  You requested Unicast ")
+                result = None
+            except socket.herror:
+                print("ERROR: command socket herror occurred")
+                result = None
+            except socket.gaierror:
+                print("ERROR: command socket gaierror occurred")
+                result = None
+            except socket.timeout:
+                print("ERROR: command socket timeout occurred. Server not responding")
                 result = None
 
-            if result is not None:
-                # set timeout to allow for keep alive messages
-                result.settimeout(2.0)
-                result.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            # set timeout to allow for keep alive messages
+            result.settimeout(2.0)
+            result.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         return result
 
@@ -295,12 +291,20 @@ class NatNetClientRaspberry:
                                   0)    # UDP
             result.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             result.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(self.multicast_address) + socket.inet_aton(self.local_ip_address))
-            
             try:
                 result.bind( (self.local_ip_address, port) )
             except socket.error as msg:
-                self.logger.error("ERROR: data socket error occurred:\n%s" %msg)
-                self.logger.error("  Check Motive/Server mode requested mode agreement.  You requested Multicast ")
+                print("ERROR: data socket error occurred:\n%s" %msg)
+                print("  Check Motive/Server mode requested mode agreement.  You requested Multicast ")
+                result = None
+            except socket.herror:
+                print("ERROR: data socket herror occurred")
+                result = None
+            except socket.gaierror:
+                print("ERROR: data socket gaierror occurred")
+                result = None
+            except socket.timeout:
+                print("ERROR: data socket timeout occurred. Server not responding")
                 result = None
         else:
             # Unicast case
@@ -308,19 +312,29 @@ class NatNetClientRaspberry:
                                   socket.SOCK_DGRAM,
                                   socket.IPPROTO_UDP)
             result.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            #result.bind( (self.local_ip_address, port) )
             try:
                 result.bind( ('', 0) )
             except socket.error as msg:
-                self.logger.error("ERROR: data socket error occurred:\n%s" %msg)
-                self.logger.error("Check Motive/Server mode requested mode agreement.  You requested Unicast ")
+                print("ERROR: data socket error occurred:\n%s" %msg)
+                print("Check Motive/Server mode requested mode agreement.  You requested Unicast ")
+                result = None
+            except socket.herror:
+                print("ERROR: data socket herror occurred")
+                result = None
+            except socket.gaierror:
+                print("ERROR: data socket gaierror occurred")
+                result = None
+            except socket.timeout:
+                print("ERROR: data socket timeout occurred. Server not responding")
                 result = None
             
-            if self.multicast_address != "255.255.255.255" and result != None:
+            if(self.multicast_address != "255.255.255.255"):
                 result.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(self.multicast_address) + socket.inet_aton(self.local_ip_address))
 
         return result
 
-    # Unpack a rigid body object from a data packet
+     # Unpack a rigid body object from a data packet
     def __unpack_rigid_body( self, data, major, minor, rb_num):
         offset = 0
 
@@ -424,7 +438,7 @@ class NatNetClientRaspberry:
 
         return offset, skeleton
 
-    # Unpack Mocap Data Functions
+#Unpack Mocap Data Functions
     def __unpack_frame_prefix_data( self, data):
         offset = 0
         # Frame number (4 bytes)
@@ -434,7 +448,6 @@ class NatNetClientRaspberry:
         frame_prefix_data=MoCapData.FramePrefixData(frame_number)
         return offset, frame_prefix_data
 
-    # Unpack a marker set object from a data packet
     def __unpack_marker_set_data( self, data, packet_size, major, minor):
         marker_set_data=MoCapData.MarkerSetData()
         offset = 0
@@ -707,9 +720,11 @@ class NatNetClientRaspberry:
     # Unpack data from a motion capture frame message
     def __unpack_mocap_data( self, data : bytes, packet_size, major, minor):
         def makeDataReadyForWebsocket(data):
-            # This function manage the data in a way such that it can be send to the websocket
-            return data
-        
+            markers = data.get_labeled_marker_data().get_labeled_markers()
+            return_data = []
+            for marker in markers:
+                return_data.append(marker.get_marker())
+            return return_data
 
         mocap_data = MoCapData.MoCapData()
         data = memoryview( data )
@@ -726,21 +741,26 @@ class NatNetClientRaspberry:
         rel_offset, marker_set_data =self.__unpack_marker_set_data(data[offset:], (packet_size - offset),major, minor)
         offset += rel_offset
         mocap_data.set_marker_set_data(marker_set_data)
+        marker_set_count = marker_set_data.get_marker_set_count()
+        unlabeled_markers_count = marker_set_data.get_unlabeled_marker_count()
 
         # Rigid Body Data
         rel_offset, rigid_body_data = self.__unpack_rigid_body_data(data[offset:], (packet_size - offset),major, minor)
         offset += rel_offset
         mocap_data.set_rigid_body_data(rigid_body_data)
+        rigid_body_count = rigid_body_data.get_rigid_body_count()
 
         # Skeleton Data
         rel_offset, skeleton_data = self.__unpack_skeleton_data(data[offset:], (packet_size - offset),major, minor)
         offset += rel_offset
         mocap_data.set_skeleton_data(skeleton_data)
+        skeleton_count = skeleton_data.get_skeleton_count()
 
         # Labeled Marker Data
         rel_offset, labeled_marker_data = self.__unpack_labeled_marker_data(data[offset:], (packet_size - offset),major, minor)
         offset += rel_offset
         mocap_data.set_labeled_marker_data(labeled_marker_data)
+        labeled_marker_count = labeled_marker_data.get_labeled_marker_count()
 
         # Force Plate Data
         rel_offset, force_plate_data = self.__unpack_force_plate_data(data[offset:], (packet_size - offset),major, minor)
@@ -758,8 +778,14 @@ class NatNetClientRaspberry:
         offset += rel_offset
         mocap_data.set_suffix_data(frame_suffix_data)
 
-        # Define returning data
+
+        timecode = frame_suffix_data.timecode
+        timecode_sub= frame_suffix_data.timecode_sub
         timestamp = frame_suffix_data.timestamp
+        is_recording = frame_suffix_data.is_recording
+        tracked_models_changed = frame_suffix_data.tracked_models_changed
+
+
         return {
             "frame_number": frame_number,
             "timestamp": timestamp,
@@ -1074,11 +1100,11 @@ class NatNetClientRaspberry:
                 trace_dd("Type: 5 Camera")
                 offset_tmp, data_tmp = self.__unpack_camera_description(data[offset:], major, minor)
             else:
-                self.logger.error("Type: " + str(data_type) + " UNKNOWN")
-                self.logger.error("ERROR: Type decode failure" )
-                self.logger.error("\t"+ str(i + 1) +" datasets processed of " + str(dataset_count))
-                self.logger.error("\t "+ str(offset) +" bytes processed of " + str(packet_size) )
-                self.logger.error("\tPACKET DECODE STOPPED")
+                print("Type: " + str(data_type) + " UNKNOWN")
+                print("ERROR: Type decode failure" )
+                print("\t"+ str(i + 1) +" datasets processed of " + str(dataset_count))
+                print("\t "+ str(offset) +" bytes processed of " + str(packet_size) )
+                print("\tPACKET DECODE STOPPED")
                 return offset
             offset += offset_tmp
             data_descs.add_data(data_tmp)
@@ -1086,6 +1112,7 @@ class NatNetClientRaspberry:
             trace_dd("\t "+ str(offset) +" bytes processed of " + str(packet_size) )
 
         return offset, data_descs
+
 
     # __unpack_server_info is for local use of the client
     # and will update the values for the versions/ NatNet capabilities
@@ -1122,8 +1149,6 @@ class NatNetClientRaspberry:
             if (self.__nat_net_stream_version_server[0] >= 4) and (self.use_multicast == False):
                 self.__can_change_bitstream_version = True
 
-
-
         trace_mf("Sending Application Name: ", self.__application_name)
         trace_mf("NatNetVersion " , str(self.__nat_net_stream_version_server[0]), " "
             , str(self.__nat_net_stream_version_server[1]), " "
@@ -1138,23 +1163,33 @@ class NatNetClientRaspberry:
 
 
     def __command_thread_function( self, in_socket, stop):
+        message_id_dict={}
         if not self.use_multicast:
             in_socket.settimeout(2.0)
-
-        # Define the data buffer
         data=bytearray(0)
-        recv_buffer_size=64*1024 # 64k buffer size
-
-        # Connect with the websocket server
+        # 64k buffer size
+        recv_buffer_size=64*1024
         while not stop():
             # Block for input
             try:
                 data, addr = in_socket.recvfrom( recv_buffer_size )
             except socket.error as msg:
                 if stop():
-                    pass
+                    #print("ERROR: command socket access error occurred:\n  %s" %msg)
+                    #return 1
+                    print("shutting down")
+            except  socket.herror:
+                print("ERROR: command socket access herror occurred")
+                return 2
+            except  socket.gaierror:
+                print("ERROR: command socket access gaierror occurred")
+                return 3
+            except  socket.timeout:
+                if(self.use_multicast):
+                    print("ERROR: command socket access timeout occurred. Server not responding")
+                    #return 4
 
-            if len( data ) > 0 :
+            if len( data ) > 0 : 
                 self.__process_message( data )
                 data=bytearray(0)
 
@@ -1167,40 +1202,36 @@ class NatNetClientRaspberry:
         # Define the data buffer
         data=bytearray(0)
         recv_buffer_size=64*1024 # 64k buffer size
-        try:
-            # Connect with the websocket server
-            with connect("ws://" + str(self.websocket_server_address) + ":" + str(self.websocket_server_port)) as websocket:
-                # Send a ping message to the websocket server
-                websocket_message = json.dumps({'category': 'optitrack', 'type': 'ping'})
-                websocket.send(websocket_message)            
-                while not stop():
+        with connect(self.websocket_connection_url) as websocket:
+            # Send a ping message to the websocket server
+            websocket_message = json.dumps({'category': 'optitrack', 'type': 'ping'})
+            websocket.send(websocket_message)            
+            while not stop():
 
-                    # Wait for the input from the websocket
-                    try:
-                            data, addr = in_socket.recvfrom( recv_buffer_size )
-                    except socket.error as msg:
-                        if not stop():
-                            print("ERROR: data socket access error occurred:\n  %s" %msg)
-                            return 1
-                    except  socket.herror:
-                            print("ERROR: data socket access herror occurred")
-                            #return 2
-                    except  socket.gaierror:
-                            print("ERROR: data socket access gaierror occurred")
-                            #return 3
-                    except  socket.timeout:
-                            #if self.use_multicast:
-                            print("ERROR: data socket access timeout occurred. Server not responding")
-                            #return 4
+                # Wait for the input from the websocket
+                try:
+                    data, addr = in_socket.recvfrom( recv_buffer_size )
+                except socket.error as msg:
+                    if not stop():
+                        print("ERROR: data socket access error occurred:\n  %s" %msg)
+                        return 1
+                except  socket.herror:
+                    print("ERROR: data socket access herror occurred")
+                    #return 2
+                except  socket.gaierror:
+                    print("ERROR: data socket access gaierror occurred")
+                        #return 3
+                except  socket.timeout:
+                    #if self.use_multicast:
+                    print("ERROR: data socket access timeout occurred. Server not responding")
+                    #return 4
 
-                    # If the data is not null send it to the websocket                
-                    if len( data ) > 0 :
-                        processed_data = self.__process_message( data )
-                        data = bytearray(0)
+                # If the data is not null send it to the websocket                
+                if len( data ) > 0 :
+                    processed_data = self.__process_message( data )
+                    websocket.send(json.dumps({'type': 'optitrack-data', 'data': json.dumps(processed_data)}))
+                    data = bytearray(0)
             return 0
-        except Exception as e:
-            self.logger.error("ERROR: websocket error occurred:\n  %s" %e)
-            self.force_shutdown = True
     
     def __process_message( self, data : bytes):
         # Get usefull informations
@@ -1309,39 +1340,6 @@ class NatNetClientRaspberry:
         self.send_request(self.command_socket, self.NAT_CONNECT, "",  (self.server_ip_address, self.command_port) )
 
         return True
-
-
-    # Print the configuration of the streaming client (the informations will be printed only if you have set that the program print on the stout)
-    def print_configuration(self):
-        if(not self.logger.get_log_on_stout()):
-            return
-        
-        # Display the information about the network configuration
-        print(bcolors.BOLD + "[DEBUG]" + bcolors.ENDC + "     Connection Configuration:")
-        print("\t   Client:          %s"% self.local_ip_address)
-        print("\t   Server:          %s"% self.server_ip_address)
-        print("\t   Command Port:    %d"% self.command_port)
-        print("\t   Data Port:       %d"% self.data_port)
-
-        if self.use_multicast:
-            print("\t   Using Multicast")
-            print("\t   Multicast Group: %s"% self.multicast_address)
-        else:
-            print("\t   Using Unicast")
-
-        # NatNet Server Info
-        application_name = self.get_application_name()
-        nat_net_requested_version = self.get_nat_net_requested_version()
-        nat_net_version_server = self.get_nat_net_version_server()
-        server_version = self.get_server_version()
-
-        print("\t   NatNet Server Info")
-        print("\t     Application Name %s" %(application_name))
-        print("\t     NatNetVersion  %d %d %d %d"% (nat_net_version_server[0], nat_net_version_server[1], nat_net_version_server[2], nat_net_version_server[3]))
-        print("\t     ServerVersion  %d %d %d %d"% (server_version[0], server_version[1], server_version[2], server_version[3]))
-        print("\t   NatNet Bitstream Requested")
-        print("\t     NatNetVersion  %d %d %d %d"% (nat_net_requested_version[0], nat_net_requested_version[1], nat_net_requested_version[2], nat_net_requested_version[3]))
-
 
     # Shut down the streaming client
     def shutdown(self):
