@@ -5,6 +5,7 @@ USE_MULTICAST = True
 
 # Websocket settings
 WEBSOCKET_SERVER_ADDRESS = "virtualenv.epfl.ch/ws"
+MAX_ATTEMPTS_TO_CONNECT = 2 # Number of attempts to connect to the websocket server before giving up
 
 # Logging settings
 LOGGING_ON_STDOUT = True

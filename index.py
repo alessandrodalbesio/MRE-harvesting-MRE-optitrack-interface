@@ -52,6 +52,8 @@ if __name__ == '__main__':
     try:
         while True:
             time.sleep(PROGRAM_LOOP_SLEEP_TIME)
+            if streaming_client.need_shutdown():
+                break
     except KeyboardInterrupt:
         pass
     except Exception as e:

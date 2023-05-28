@@ -25,7 +25,9 @@ import time
 import modules.DataDescriptions as DataDescriptions
 import modules.MoCapData as MoCapData
 from websockets.sync.client import connect
+from websockets.exceptions import ConnectionClosedError
 import json
+from modules.Settings import *
 
 # Function used by the NatNetClient class to print the messages. Uncomment the one you want to use.
 def trace( *args ):
@@ -124,8 +126,11 @@ class NatNetClientRaspberry:
         # Define the websocket connection url
         self.websocket_connection_url = ""
 
-    def need_to_force_shutdown(self):
-        return self.force_shutdown
+        # Define a variable used to shutdown the threads
+        self.shutdown_threads = False
+
+    def need_shutdown(self):
+        return self.shutdown_threads
 
     # Set and get functions
     def get_message_id(self, data):
@@ -790,7 +795,7 @@ class NatNetClientRaspberry:
             "frame_number": frame_number,
             "timestamp": timestamp,
             "mocap_data": makeDataReadyForWebsocket(mocap_data)
-        })
+        }
 
     # Unpack a marker set description packet
     def __unpack_marker_set_description( self, data, major, minor):
@@ -1202,37 +1207,50 @@ class NatNetClientRaspberry:
         # Define the data buffer
         data=bytearray(0)
         recv_buffer_size=64*1024 # 64k buffer size
-        with connect(self.websocket_connection_url) as websocket:
-            # Send a ping message to the websocket server
-            websocket_message = json.dumps({'category': 'optitrack', 'type': 'ping'})
-            websocket.send(websocket_message)            
-            while not stop():
+        attempts = 0
+        while not stop() and attempts < MAX_ATTEMPTS_TO_CONNECT:
+            try:
+                with connect(self.websocket_connection_url) as websocket:
+                    self.logger.info('Successfully connected to websocket server')
+                    attempts = 0
+                    # Send a ping message to the websocket server
+                    websocket_message = json.dumps({'category': 'optitrack', 'type': 'ping'})
+                    websocket.send(websocket_message)            
+                    while not stop():
 
-                # Wait for the input from the websocket
-                try:
-                    data, addr = in_socket.recvfrom( recv_buffer_size )
-                except socket.error as msg:
-                    if not stop():
-                        print("ERROR: data socket access error occurred:\n  %s" %msg)
-                        return 1
-                except  socket.herror:
-                    print("ERROR: data socket access herror occurred")
-                    #return 2
-                except  socket.gaierror:
-                    print("ERROR: data socket access gaierror occurred")
-                        #return 3
-                except  socket.timeout:
-                    #if self.use_multicast:
-                    print("ERROR: data socket access timeout occurred. Server not responding")
-                    #return 4
+                        # Wait for the input from the websocket
+                        try:
+                            data, addr = in_socket.recvfrom( recv_buffer_size )
+                        except socket.error as msg:
+                            if not stop():
+                                print("ERROR: data socket access error occurred:\n  %s" %msg)
+                                return 1
+                        except  socket.herror:
+                            print("ERROR: data socket access herror occurred")
+                            #return 2
+                        except  socket.gaierror:
+                            print("ERROR: data socket access gaierror occurred")
+                                #return 3
+                        except  socket.timeout:
+                            #if self.use_multicast:
+                            print("ERROR: data socket access timeout occurred. Server not responding")
+                            #return 4
 
-                # If the data is not null send it to the websocket                
-                if len( data ) > 0 :
-                    processed_data = self.__process_message( data )
-                    websocket.send(json.dumps({'type': 'optitrack-data', 'data': json.dumps(processed_data)}))
-                    data = bytearray(0)
-            return 0
-    
+                        # If the data is not null send it to the websocket                
+                        if len( data ) > 0 :
+                            processed_data = self.__process_message( data )
+                            websocket.send(json.dumps({'type': 'optitrack-data', 'data': json.dumps(processed_data)}))
+                            data = bytearray(0)
+                    return 0
+            except Exception as e:
+                attempts += 1
+                sleep_time = attempts if attempts <= 2 else min(attempts * 2, 10)
+                self.logger.debug('Something went wrong with the connection to the websocket server. Retrying in %d seconds' % sleep_time)
+                time.sleep(sleep_time)
+        if attempts >= MAX_ATTEMPTS_TO_CONNECT:
+            self.logger.error('Could not connect to websocket server')
+            self.shutdown_threads = True
+
     def __process_message( self, data : bytes):
         # Get usefull informations
         major = self.get_major()
