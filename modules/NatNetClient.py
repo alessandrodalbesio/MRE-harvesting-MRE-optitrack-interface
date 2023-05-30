@@ -1211,7 +1211,6 @@ class NatNetClientRaspberry:
         while not stop() and attempts < MAX_ATTEMPTS_TO_CONNECT:
             try:
                 with connect(self.websocket_connection_url) as websocket:
-                    self.logger.info('Successfully connected to websocket server')
                     attempts = 0
                     # Send a ping message to the websocket server
                     websocket_message = json.dumps({'category': 'optitrack', 'type': 'ping'})
@@ -1244,9 +1243,10 @@ class NatNetClientRaspberry:
                     return 0
             except Exception as e:
                 attempts += 1
-                sleep_time = attempts if attempts <= 2 else min(attempts * 2, 10)
-                self.logger.debug('Something went wrong with the connection to the websocket server. Retrying in %d seconds' % sleep_time)
-                time.sleep(sleep_time)
+                if attempts <= 3:
+                    time.sleep(0.5)
+                else:
+                    time.sleep(attempts * 2)
         if attempts >= MAX_ATTEMPTS_TO_CONNECT:
             self.logger.error('Could not connect to websocket server')
             self.shutdown_threads = True

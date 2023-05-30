@@ -1,11 +1,11 @@
 # Optitrack settings
-CLIENT_ADDRESS = "10.99.2.243"
+CLIENT_ADDRESS = "10.99.2.60"
 OPTITRACK_ADDRESS = "10.99.2.4"
 USE_MULTICAST = True
 
 # Websocket settings
 WEBSOCKET_SERVER_ADDRESS = "virtualenv.epfl.ch/ws"
-MAX_ATTEMPTS_TO_CONNECT = 2 # Number of attempts to connect to the websocket server before giving up
+MAX_ATTEMPTS_TO_CONNECT = 5 # Number of attempts to connect to the websocket server before giving up
 
 # Logging settings
 LOGGING_ON_STDOUT = True
