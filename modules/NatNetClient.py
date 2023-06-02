@@ -25,8 +25,20 @@ import time
 import modules.DataDescriptions as DataDescriptions
 import modules.MoCapData as MoCapData
 from websockets.sync.client import connect
+from websockets.exceptions import WebSocketException
 import json
 from modules.settings import *
+import traceback
+import sys
+
+def test_connection(logger):
+    if VERIFY_CONNECTION == False:
+        return
+    try:
+        socket.gethostbyname(DNS_CONNECTION_TESTING)
+    except Exception as e:
+        logger.error("ERROR: No internet connection. Please connect to internet and try again.")
+        sys.exit(1)
 
 # Function used by the NatNetClient class to print the messages. Uncomment the one you want to use.
 def trace( *args ):
@@ -728,7 +740,7 @@ class NatNetClientRaspberry:
             return_data = []
             markers = data.get_marker_set_data().get_labeled_data()
             for markerSet in markers:
-                if markerSet.get_model_name_str() == HOLDER_RIGIDBODY_REF_NAME or markerSet.get_model_name_str() == OBJECT_RIGIDBODY_REF_NAME or markerSet.get_model_name_str() == HEADSET_RIGIDBODY_REF_NAME:
+                if markerSet.get_model_name_str() in [filter['name'] for filter in RIGIDBODY_FILTER]:
                     points = markerSet.get_pos_list()
                     counter_id = 0
                     for i in points:
@@ -745,10 +757,10 @@ class NatNetClientRaspberry:
             # Get rigid body data
             rigid_bodies = data.get_rigid_body_data().get_rigid_body_list()
             for rigid_body in rigid_bodies:
-                if rigid_body.id_num == HOLDER_RIGIDBODY_ID or rigid_body.id_num == OBJECT_RIGIDBODY_ID or rigid_body.id_num == HEADSET_RIGIDBODY_ID:
+                if rigid_body.get_id() in [filter['id'] for filter in RIGIDBODY_FILTER]:
                     return_data.append({
                             'type': 'rigidBody',
-                            'ID': rigid_body.id_num,
+                            'ID': rigid_body.get_id(),
                             'x': rigid_body.get_pos()[0],
                             'y': rigid_body.get_pos()[1],
                             'z': rigid_body.get_pos()[2],
@@ -817,7 +829,6 @@ class NatNetClientRaspberry:
         timestamp = frame_suffix_data.timestamp
         is_recording = frame_suffix_data.is_recording
         tracked_models_changed = frame_suffix_data.tracked_models_changed
-
 
         return {
             "frame_number": frame_number,
@@ -1207,10 +1218,7 @@ class NatNetClientRaspberry:
             try:
                 data, addr = in_socket.recvfrom( recv_buffer_size )
             except socket.error as msg:
-                if stop():
-                    #print("ERROR: command socket access error occurred:\n  %s" %msg)
-                    #return 1
-                    print("shutting down")
+                pass
             except  socket.herror:
                 print("ERROR: command socket access herror occurred")
                 return 2
@@ -1269,15 +1277,13 @@ class NatNetClientRaspberry:
                             websocket.send(json.dumps({'type': 'optitrack-data', 'data': json.dumps(processed_data)}))
                             data = bytearray(0)
                     return 0
-            except Exception as e:
-                print(e)
+            except WebSocketException as e:
                 attempts += 1
-                if attempts <= 3:
-                    time.sleep(0.5)
-                else:
-                    time.sleep(attempts * 2)
+                reconnect_rule(attempts)
+            except Exception as e:
+                self.logger.error('Something went wrong : ' + str(traceback.format_exc()))
         if attempts >= MAX_ATTEMPTS_TO_CONNECT:
-            self.logger.error('Could not connect to websocket server')
+            self.logger.error('Could not connect to websocket server: Too many attempts')
             self.shutdown_threads = True
 
     def __process_message( self, data : bytes):
@@ -1391,7 +1397,7 @@ class NatNetClientRaspberry:
     # Shut down the streaming client
     def shutdown(self):
         # Log that the system is shutting down
-        self.logger.info("Shutting down...")
+        self.logger.info("Shutting down. This might take a while.")
 
         # Stop the threads
         self.stop_threads = True

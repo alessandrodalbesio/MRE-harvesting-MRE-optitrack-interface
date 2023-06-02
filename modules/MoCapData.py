@@ -221,6 +221,9 @@ class RigidBody:
         self.rb_marker_list.append(copy.deepcopy(rigid_body_marker))
         return len(self.rb_marker_list)
 
+    def get_id(self):
+        return self.id_num
+
     def get_pos(self):
         return self.pos
     

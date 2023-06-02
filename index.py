@@ -1,18 +1,20 @@
 import sys
 import time
 import traceback
-from modules.Settings import *
+from modules.settings import *
 from modules.NatNetClient import *
 from modules.logging import logger
 
 if __name__ == '__main__':
+    # Verify that the system has access to internet
     loggerManager = logger(log_on_stout = LOGGING_ON_STDOUT)
+    test_connection(loggerManager)
 
     ##### Initialize the streaming client #####
     try:
         # Log that the service is starting
         loggerManager.info("Starting service")
-
+        
         # Create the NatNet client and define the various parameters
         streaming_client = NatNetClientRaspberry()
         streaming_client.set_client_address(CLIENT_ADDRESS)
@@ -50,7 +52,7 @@ if __name__ == '__main__':
     ##### Run the streaming client loop #####
     exit_code = 0
     try:
-        print("Press Ctrl+C to stop the OptitrackBridge service.")
+        print("Press Ctrl+C to stop the Optitrack Bridge service.")
         while True:
             time.sleep(PROGRAM_LOOP_SLEEP_TIME)
             if streaming_client.need_shutdown():
