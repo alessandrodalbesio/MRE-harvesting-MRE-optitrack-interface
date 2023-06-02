@@ -1,9 +1,9 @@
-from modules.Settings import *
 import sys
 import time
-from modules.NatNetClient import *
-from modules.LoggingUtils import logger
 import traceback
+from modules.Settings import *
+from modules.NatNetClient import *
+from modules.logging import logger
 
 if __name__ == '__main__':
     loggerManager = logger(log_on_stout = LOGGING_ON_STDOUT)
@@ -18,7 +18,7 @@ if __name__ == '__main__':
         streaming_client.set_client_address(CLIENT_ADDRESS)
         streaming_client.set_server_address(OPTITRACK_ADDRESS)
         streaming_client.set_use_multicast(USE_MULTICAST)
-        streaming_client.set_websocket_connection_url(WEBSOCKET_SERVER_ADDRESS, is_DNS=True)
+        streaming_client.set_websocket_connection_url(WEBSOCKET_SERVER_ADDRESS, is_DNS=IS_WEBSOCKET_ADDRESS_DNS)
         streaming_client.set_logger(loggerManager)
 
         # Start up the streaming client
@@ -40,7 +40,7 @@ if __name__ == '__main__':
             loggerManager.debug("Streaming client connected")
         time.sleep(PROGRAM_SLEEP_TIME)
     except Exception as e:
-        logger.error("An exception occurred while initializing the streaming client. \n" + traceback.format_exc())
+        loggerManager.error("An exception occurred while initializing the streaming client. \n" + traceback.format_exc())
         streaming_client.shutdown()
         sys.exit(3)
     else:
@@ -50,6 +50,7 @@ if __name__ == '__main__':
     ##### Run the streaming client loop #####
     exit_code = 0
     try:
+        print("Press Ctrl+C to stop the OptitrackBridge service.")
         while True:
             time.sleep(PROGRAM_LOOP_SLEEP_TIME)
             if streaming_client.need_shutdown():
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        logger.error("ERROR: An exception occurred while running the streaming client loop.")
+        loggerManager.error("ERROR: An exception occurred while running the streaming client loop.")
         exit_code = 4
     finally:
         streaming_client.shutdown()

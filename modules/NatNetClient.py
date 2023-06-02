@@ -25,9 +25,8 @@ import time
 import modules.DataDescriptions as DataDescriptions
 import modules.MoCapData as MoCapData
 from websockets.sync.client import connect
-from websockets.exceptions import ConnectionClosedError
 import json
-from modules.Settings import *
+from modules.settings import *
 
 # Function used by the NatNetClient class to print the messages. Uncomment the one you want to use.
 def trace( *args ):
