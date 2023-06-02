@@ -16,7 +16,7 @@ class logger:
     def __init__(self, log_on_stout = False):
         self.log_on_stout = log_on_stout
 
-        self.logger = logging.getLogger('OptitrackConnection')
+        self.logger = logging.getLogger('OptitrackBridge')
         self.logger.setLevel(logging.DEBUG)
 
         # Create file handler
@@ -31,9 +31,6 @@ class logger:
             format = logging.Formatter(bcolors.BOLD + "[%(levelname)s]" + bcolors.ENDC + " %(message)s")
             handler.setFormatter(format)
             self.logger.addHandler(handler)
-
-    def get_log_on_stout(self):
-        return self.log_on_stout
 
     def debug(self, text):
         self.logger.debug(text)
