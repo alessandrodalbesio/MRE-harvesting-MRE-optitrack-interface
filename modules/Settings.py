@@ -3,6 +3,14 @@ CLIENT_ADDRESS = "10.99.2.60"
 OPTITRACK_ADDRESS = "10.99.2.4"
 USE_MULTICAST = True
 
+# Define the ID of the rigidbody to track (DO NOT CHANGE. BE SURE THAT THESE DATA ARE THE SAME IN THE MOTIVE PROJECT)
+HOLDER_RIGIDBODY_ID = 100
+HOLDER_RIGIDBODY_REF_NAME = "Holder"
+OBJECT_RIGIDBODY_ID = 101
+OBJECT_RIGIDBODY_REF_NAME = "Raspberry"
+HEADSET_RIGIDBODY_ID = 102
+HEADSET_RIGIDBODY_REF_NAME = "Headset"
+
 # Websocket settings
 WEBSOCKET_SERVER_ADDRESS = "virtualenv.epfl.ch/ws"
 MAX_ATTEMPTS_TO_CONNECT = 5 # Number of attempts to connect to the websocket server before giving up

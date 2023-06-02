@@ -725,10 +725,39 @@ class NatNetClientRaspberry:
     # Unpack data from a motion capture frame message
     def __unpack_mocap_data( self, data : bytes, packet_size, major, minor):
         def makeDataReadyForWebsocket(data):
-            markers = data.get_labeled_marker_data().get_labeled_markers()
+            # Get labeled marker data
             return_data = []
-            for marker in markers:
-                return_data.append(marker.get_marker())
+            markers = data.get_marker_set_data().get_labeled_data()
+            for markerSet in markers:
+                if markerSet.get_model_name_str() == HOLDER_RIGIDBODY_REF_NAME or markerSet.get_model_name_str() == OBJECT_RIGIDBODY_REF_NAME or markerSet.get_model_name_str() == HEADSET_RIGIDBODY_REF_NAME:
+                    points = markerSet.get_pos_list()
+                    counter_id = 0
+                    for i in points:
+                        counter_id  += 1
+                        return_data.append({
+                            'type': 'marker',
+                            'ID': counter_id,
+                            'rigidBody': markerSet.get_model_name_str(),
+                            'x': i[0],
+                            'y': i[1],
+                            'z': i[2]
+                        })
+            
+            # Get rigid body data
+            rigid_bodies = data.get_rigid_body_data().get_rigid_body_list()
+            for rigid_body in rigid_bodies:
+                if rigid_body.id_num == HOLDER_RIGIDBODY_ID or rigid_body.id_num == OBJECT_RIGIDBODY_ID or rigid_body.id_num == HEADSET_RIGIDBODY_ID:
+                    return_data.append({
+                            'type': 'rigidBody',
+                            'ID': rigid_body.id_num,
+                            'x': rigid_body.get_pos()[0],
+                            'y': rigid_body.get_pos()[1],
+                            'z': rigid_body.get_pos()[2],
+                            'qx': rigid_body.get_rot()[0],
+                            'qy': rigid_body.get_rot()[1],
+                            'qz': rigid_body.get_rot()[2],
+                            'qw': rigid_body.get_rot()[3]
+                    })
             return return_data
 
         mocap_data = MoCapData.MoCapData()
@@ -1242,6 +1271,7 @@ class NatNetClientRaspberry:
                             data = bytearray(0)
                     return 0
             except Exception as e:
+                print(e)
                 attempts += 1
                 if attempts <= 3:
                     time.sleep(0.5)

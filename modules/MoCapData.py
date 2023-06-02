@@ -125,10 +125,15 @@ class MarkerData:
     def set_model_name(self, model_name):
         self.model_name = model_name
 
+    def get_model_name_str(self):
+        return str(self.model_name.decode("utf-8"))
+
     def add_pos(self, pos):
         self.marker_pos_list.append(copy.deepcopy(pos))
         return len(self.marker_pos_list)
-
+    
+    def get_pos_list(self):
+        return self.marker_pos_list
 
     def get_num_points(self):
         return len(self.marker_pos_list)
@@ -159,6 +164,9 @@ class MarkerSetData:
 
     def add_unlabeled_marker(self, pos):
         self.unlabeled_markers.add_pos(pos)
+    
+    def get_labeled_data(self):
+        return self.marker_data_list
 
     def get_marker_set_count(self):
         return len(self.marker_data_list)
@@ -213,6 +221,11 @@ class RigidBody:
         self.rb_marker_list.append(copy.deepcopy(rigid_body_marker))
         return len(self.rb_marker_list)
 
+    def get_pos(self):
+        return self.pos
+    
+    def get_rot(self):
+        return self.rot
 
     def get_as_string(self, tab_str=0, level=0):
         out_tab_str = get_tab_str(tab_str, level)
@@ -257,10 +270,11 @@ class RigidBodyData:
         self.rigid_body_list.append(copy.deepcopy(rigid_body))
         return len(self.rigid_body_list)
 
+    def get_rigid_body_list(self):
+        return self.rigid_body_list
 
     def get_rigid_body_count(self):
         return len(self.rigid_body_list)
-
 
     def get_as_string(self, tab_str="  ", level=0):
         out_tab_str = get_tab_str(tab_str, level)
@@ -594,8 +608,14 @@ class MoCapData:
     def set_marker_set_data(self, new_marker_set_data):
         self.marker_set_data = new_marker_set_data
 
+    def get_marker_set_data(self):
+        return self.marker_set_data
+
     def set_rigid_body_data(self, new_rigid_body_data):
         self.rigid_body_data = new_rigid_body_data
+
+    def get_rigid_body_data(self):
+        return self.rigid_body_data
 
     def set_skeleton_data(self, new_skeleton_data):
         self.skeleton_data = new_skeleton_data
