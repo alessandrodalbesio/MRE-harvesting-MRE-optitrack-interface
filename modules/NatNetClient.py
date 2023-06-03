@@ -751,6 +751,10 @@ class NatNetClient:
     # Unpack data from a motion capture frame message
     def __unpack_mocap_data( self, data : bytes, packet_size, major, minor):
         def makeDataReadyForWebsocket(data):
+            # If the rigidbody filter is off return everything
+            if RIGIDBODY_FILTER_ON == False:
+                return data
+            
             # Get labeled marker data
             return_data = []
             markers = data.get_marker_set_data().get_labeled_data()

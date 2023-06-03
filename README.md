@@ -13,7 +13,7 @@ After that you need to install the required modules with the command:
 pip install -r requirements.txt
 ```
 Before running the <code>main.py</code> file it's important that you verify that:
-- You are in the same network of the Optitrack system which you want to stream informations from
+- You are in the same network of the Optitrack system which you want to stream informations from (or that the two networks are connected)
 - On the Optitrack system the streaming of data is turned on
 - You have set up the parameters in the <code>modules/settings.py</code> file (such as the client address, the server addres, ...)
 - The websocket server is up and running. If the websocket is turned off the bridge will start but it will turn off very shortly.
