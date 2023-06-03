@@ -9,14 +9,14 @@ USE_MULTICAST = True # Optitrack uses multicast to send data. If you are not usi
 RIGIDBODY_FILTER_ON = True
 RIGIDBODY_FILTER = [
     {
-        "ID": 100, 
-        "Name": "Holder"
+        "id": 100, 
+        "name": "Holder"
     }, {
-        "ID": 101,
-        "Name": "Raspberry"
+        "id": 101,
+        "name": "Raspberry"
     }, {
-        "ID": 102,
-        "Name": "Headset"
+        "id": 102,
+        "name": "Headset"
     }
 ]
 
