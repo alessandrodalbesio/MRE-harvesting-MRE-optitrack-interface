@@ -24,21 +24,16 @@ import copy
 import time
 import modules.DataDescriptions as DataDescriptions
 import modules.MoCapData as MoCapData
-from websockets.sync.client import connect
-from websockets.exceptions import WebSocketException
+import websockets
 import json
 from modules.settings import *
 import traceback
 import sys
+import asyncio
+import signal
+from modules.logging import logger
+import random
 
-def test_connection(logger):
-    if VERIFY_CONNECTION == False:
-        return
-    try:
-        socket.gethostbyname(DNS_CONNECTION_TESTING)
-    except Exception as e:
-        logger.error("ERROR: No internet connection. Please connect to internet and try again.")
-        sys.exit(1)
 
 # Function used by the NatNetClient class to print the messages. Uncomment the one you want to use.
 def trace( *args ):
@@ -65,8 +60,14 @@ NNIntValue = struct.Struct( '<I')
 FPCalMatrixRow = struct.Struct( '<ffffffffffff' )
 FPCorners      = struct.Struct( '<ffffffffffff')
 
+class NetworkConnectionError(Exception):
+    pass
+
+class WebsocketConnectionLost(Exception):
+    pass
+
 # Definition of the personalized NatNetClient class
-class NatNetClientRaspberry:   
+class NatNetClient:   
     # Client/server message ids
     NAT_CONNECT               = 0
     NAT_SERVERINFO            = 1
@@ -84,6 +85,13 @@ class NatNetClientRaspberry:
 
     # Costructor of the class
     def __init__( self ):
+        self.logger = logger(log_on_stout = LOGGING_ON_STDOUT)
+
+        # Verify that the connection is working
+        if(self.check_connection() == False):
+            self.logger.error("ERROR: No internet connection. Please connect to internet and try again.")
+            raise NetworkConnectionError
+
         # Change this value to the IP address of the NatNet server.
         self.server_ip_address = "127.0.0.1"
 
@@ -131,17 +139,19 @@ class NatNetClientRaspberry:
 
         self.stop_threads=False
 
-        # Logger
-        self.logger = None
-
         # Define the websocket connection url
         self.websocket_connection_url = ""
 
-        # Define a variable used to shutdown the threads
+        # With this function it's possible to define from inside the threads that the program should stop (otherwise the shutdown process won't work)
         self.shutdown_threads = False
+
+        self.isReady = False
 
     def need_shutdown(self):
         return self.shutdown_threads
+
+    def set_shutdown(self):
+        self.shutdown_threads = True
 
     # Set and get functions
     def get_message_id(self, data):
@@ -172,10 +182,6 @@ class NatNetClientRaspberry:
 
     def get_websocket_connection_url(self):
         return self.websocket_connection_url
-
-    def set_logger(self, logger):
-        if not self.__is_locked:
-            self.logger = logger
 
     def set_use_multicast(self, use_multicast):
         if not self.__is_locked:
@@ -243,6 +249,15 @@ class NatNetClientRaspberry:
         # Return status
         return is_connected
 
+    def check_connection(self):
+        if VERIFY_CONNECTION == False:
+            return
+        try:
+            socket.gethostbyname(DNS_CONNECTION_TESTING)
+        except Exception as e:
+            return False
+        else:
+            return True
 
     # Create a command socket to attach to the NatNet stream
     def __create_command_socket( self ):
@@ -1207,7 +1222,6 @@ class NatNetClientRaspberry:
 
 
     def __command_thread_function( self, in_socket, stop):
-        message_id_dict={}
         if not self.use_multicast:
             in_socket.settimeout(2.0)
         data=bytearray(0)
@@ -1239,52 +1253,91 @@ class NatNetClientRaspberry:
                     self.send_keep_alive(in_socket, self.server_ip_address, self.command_port)
         return 0
 
-    def __data_thread_function( self, in_socket, stop):
-        # Define the data buffer
-        data=bytearray(0)
-        recv_buffer_size=64*1024 # 64k buffer size
-        attempts = 0
-        while not stop() and attempts < MAX_ATTEMPTS_TO_CONNECT:
-            try:
-                with connect(self.websocket_connection_url) as websocket:
-                    attempts = 0
-                    # Send a ping message to the websocket server
-                    websocket_message = json.dumps({'category': 'optitrack', 'type': 'ping'})
-                    websocket.send(websocket_message)            
-                    while not stop():
+    def __data_thread_function_wrap( self, in_socket, stop):
+        # Execute the data thread function
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.__data_thread_function(in_socket, stop))
 
-                        # Wait for the input from the websocket
-                        try:
-                            data, addr = in_socket.recvfrom( recv_buffer_size )
-                        except socket.error as msg:
-                            if not stop():
-                                print("ERROR: data socket access error occurred:\n  %s" %msg)
-                                return 1
-                        except  socket.herror:
-                            print("ERROR: data socket access herror occurred")
-                            #return 2
-                        except  socket.gaierror:
-                            print("ERROR: data socket access gaierror occurred")
+        # Wait for all tasks to be completed
+        pending = asyncio.all_tasks(loop=loop)
+        loop.run_until_complete(asyncio.gather(*pending))
+        loop.close()
+
+        # Shut down everything
+        self.set_shutdown()
+
+    async def __data_thread_function( self, in_socket, stop):
+        try:
+            # Define the data buffer
+            data=bytearray(0)
+            recv_buffer_size=64*1024 # 64k buffer size
+            websocket_attempts = 0
+            connection_attempts = 0
+
+            while not stop():
+                try:
+                    # Verify that the system is ready
+                    if self.isReady == False:
+                        await asyncio.sleep(0.5) # Wait for 500 ms
+                        continue
+
+                    # Verify that the computer is connected to internet
+                    if self.check_connection() == False:
+                        raise NetworkConnectionError("Connection to the server lost")
+                    connection_attempts = 0
+
+                    # Start websocket connection
+                    async with websockets.connect(self.websocket_connection_url) as websocket:
+                        websocket_attempts = 0
+                        while not stop():
+                            # Wait for the input from the websocket
+                            try:
+                                data, addr = in_socket.recvfrom( recv_buffer_size )
+                            except socket.error as msg:
+                                if not stop():
+                                    self.logger.error("ERROR: data socket access error occurred:\n  %s" %msg)
+                                    return 1
+                            except  socket.herror:
+                                print("ERROR: data socket access herror occurred")
+                                #return 2
+                            except  socket.gaierror:
+                                print("ERROR: data socket access gaierror occurred")
                                 #return 3
-                        except  socket.timeout:
-                            #if self.use_multicast:
-                            print("ERROR: data socket access timeout occurred. Server not responding")
-                            #return 4
+                            except  socket.timeout:
+                                #if self.use_multicast:
+                                print("ERROR: data socket access timeout occurred. Server not responding")
+                                #return 4
 
-                        # If the data is not null send it to the websocket                
-                        if len( data ) > 0 :
-                            processed_data = self.__process_message( data )
-                            websocket.send(json.dumps({'type': 'optitrack-data', 'data': json.dumps(processed_data)}))
-                            data = bytearray(0)
-                    return 0
-            except WebSocketException as e:
-                attempts += 1
-                reconnect_rule(attempts)
-            except Exception as e:
-                self.logger.error('Something went wrong : ' + str(traceback.format_exc()))
-        if attempts >= MAX_ATTEMPTS_TO_CONNECT:
-            self.logger.error('Could not connect to websocket server: Too many attempts')
-            self.shutdown_threads = True
+                            # If the data is not null send it to the websocket                
+                            if len( data ) > 0 :
+                                processed_data = self.__process_message( data )
+                                await websocket.send(json.dumps({'type': 'optitrack-data', 'data': json.dumps(processed_data)}))
+                                data = bytearray(0)
+                except websockets.ConnectionClosedError:
+                    continue
+                except websockets.InvalidStatusCode as e: # This is to handle when the server is not turned on
+                    websocket_attempts += 1
+                    if websocket_attempts > MAX_ATTEMPTS_TO_CONNECT:
+                        self.logger.error("Websocket connection failed. Verify that the websocket server is on.")
+                        return 1
+                    time_to_sleep = 2**websocket_attempts + random.randint(0, 1000) / 1000 # Exponential backoff
+                    await asyncio.sleep(time_to_sleep)
+                    continue
+                except NetworkConnectionError as e: # This is to handle when the connection is lost
+                    connection_attempts += 1
+                    if connection_attempts > MAX_ATTEMPTS_TO_CONNECT:
+                        self.logger.error("Your connection has been lost for too long.")
+                        return 1
+                    time_to_sleep = 2**connection_attempts + random.randint(0, 1000) / 1000 # Exponential backoff
+                    await asyncio.sleep(time_to_sleep)
+                    continue
+            return 0
+        except KeyboardInterrupt:
+            return 0
+        except Exception as e:
+            self.logger("Error: " + str(e))
+            return 1
 
     def __process_message( self, data : bytes):
         # Get usefull informations
@@ -1365,7 +1418,7 @@ class NatNetClientRaspberry:
         return self.__server_version
 
     # Run the streaming client
-    def run( self ):
+    def __start( self ):
         # Create the data socket
         self.data_socket = self.__create_data_socket( self.data_port )
         if self.data_socket is None :
@@ -1380,9 +1433,10 @@ class NatNetClientRaspberry:
         
         self.__is_locked = True # Set the variable to avoid changing the parameters in the middle of execution
 
-        self.stop_threads = False
+        self.stop_threads = False # Shared variable to stop the threads
+
         # Create a separate thread for receiving data packets
-        self.data_thread = Thread( target = self.__data_thread_function, args = (self.data_socket, lambda : self.stop_threads, ))
+        self.data_thread = Thread( target = self.__data_thread_function_wrap, args = (self.data_socket, lambda : self.stop_threads, ))
         self.data_thread.start()
 
         # Create a separate thread for receiving command packets
@@ -1394,18 +1448,73 @@ class NatNetClientRaspberry:
 
         return True
 
+    def start(self):
+        try:
+            # Start up the streaming client
+            is_running = self.__start()
+            if not is_running:
+                self.logger.error("Could not start streaming client.")
+                self.shutdown()
+                sys.exit(1)
+            else:
+                self.logger.debug("Streaming client running")
+            time.sleep(PROGRAM_SLEEP_TIME)
+
+            # Check if the streaming client is connected to the server
+            if self.connected() is False:
+                self.logger.error("Streaming client failed to connect to server at address: " + OPTITRACK_ADDRESS)
+                self.shutdown()
+                sys.exit(1)
+            else:
+                self.logger.debug("Streaming client connected")
+            time.sleep(PROGRAM_SLEEP_TIME)
+        except KeyboardInterrupt:
+            self.logger.debug("Optitrack Bridge service stopped by user.")
+            self.shutdown()
+            sys.exit(0)
+        except Exception as e:
+            self.logger.error("An exception occurred while initializing the streaming client. \n" + traceback.format_exc())
+            self.shutdown()
+            sys.exit(1)
+        else:
+            self.logger.debug("Streaming client initialized successfully")
+
+    def run(self):
+        try:
+            print("Press Ctrl+C to stop the service.")
+            self.isReady = True
+            while not self.need_shutdown():
+                time.sleep(PROGRAM_LOOP_SLEEP_TIME)
+        except KeyboardInterrupt:
+            self.shutdown()
+            sys.exit(0)
+        except Exception as e:
+            self.logger.error("ERROR: An exception occurred while running the streaming client loop.")
+            self.shutdown()
+            sys.exit(1)
+        else:
+            self.shutdown()
+            sys.exit(0)
+
     # Shut down the streaming client
     def shutdown(self):
-        # Log that the system is shutting down
-        self.logger.info("Shutting down. This might take a while.")
+        # Stop the ability for the user to press CTRL + C to stop the program (otherwise the program will stay alive indefinitely)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-        # Stop the threads
+        # Log that the system is shutting down
+        self.logger.debug("Shutting down. This might take a while.")
+
+        # Update the shared variable to stop the threads
         self.stop_threads = True
         
         # Closing sockets causes blocking recvfrom to throw an exception and break the loop
         self.command_socket.close()
         self.data_socket.close()
 
-        # Attempt to join the threads back.
+        # Join the threads to make sure that they are closed at the end of the program
         self.command_thread.join()
         self.data_thread.join()
+
+        # Log that the shutdown is complete
+        self.logger.info("Shutdown complete.")
+        
