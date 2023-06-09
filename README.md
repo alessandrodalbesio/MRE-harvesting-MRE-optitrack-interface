@@ -1,14 +1,15 @@
 # Optitrack Bridge
+This repository has been developed as part of the project *"Mixed Reality Environment For Harvesting Study"* done by Alessandro Dalbesio.
 
 ## Getting started
 The code in this repository implements a bridge between the optitrack system and a websocket server. <br>
-The code in this repository is a modified version of the NatNet SDK for Python (more information can be found in the <b>Third party libraries</b> section). <br><br>
+This is a modified version of the NatNet SDK for Python (more information can be found in the <b>Third party libraries</b> section). <br><br>
 The schema of the Optitrack Bridge is: <br>
 ![Alt Text](readme-files/schema.png)
 
 ## Installation
 You can install this repository in any device connected to the same network/s of the OptiTrack system and the Websocket Server. <br>
-The OptiTrack is behind a VPN (ZeroTier) and so you should connect to it before being able to stream the data. <br><br>
+The OptiTrack is behind a VPN (ZeroTier) and so you should connect to it before being able to stream the data from it. <br><br>
 To install the repository you need to:
 1. Clone it
 ```bash
@@ -25,12 +26,13 @@ venv\Scripts\activate # Windows
 pip install -r requirements.txt
 ```
 Before running the <code>main.py</code> file it's important that you verify that:
-- You are in the same network of the Optitrack system which you want to stream informations from (currently you can do this with ZeroTier VPN).
+- You are in the same network of the Optitrack system which you want to stream informations from (currently you should be connected with the ZeroTier VPN).
 - On the Optitrack system the streaming of data is turned on (you can find a screenshot of the configuration in the <b>OptiTrack server configuration</b> section)
 - You have set up the parameters in the <code>modules/settings.py</code> file (such as the client address, the server addres, ...)
 - The websocket server is up and running. If the websocket is turned off the bridge will start but it will turn off very shortly. If the connection between the websocket server and the OptiTrack bridge is lost the bridge will try to reconnect to the websocket server. The number of reconnection attempts is set in the <code>modules/settings.py</code> file.
 
-Please take into account that in some cases it might take few second before starting streaming the data to the Websocket Server. <br><br>
+Please take into account that in some cases it might take few second before starting streaming the data to the Websocket Server. <br>
+<b>IMPORTANT</b>: Please be sure to have all other VPN disconnected since they might interfere and the OptiTrack system might not be able to stream the data to the bridge.
 
 If you are running the program with a manager (e.g. <code>supervisor</code>) is suggested to set the variable <code>LOGGING_ON_STDOUT</code> in the file <code>settings.py</code> to <code>False</code> while is recomended to put it to <code>True</code> if you are running it in a command windows. <br>
 The logging on the stdout (controller with the variable <code>LOGGING_ON_STDOUT</code>) is set to a logging level of **DEBUG** while the logging on the file is set to a logging level of **INFO**. <br>

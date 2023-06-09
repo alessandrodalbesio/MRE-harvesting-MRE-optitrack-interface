@@ -1317,6 +1317,7 @@ class NatNetClient:
                             if len( data ) > 0 :
                                 processed_data = self.__process_message( data )
                                 await websocket.send(json.dumps({'type': 'optitrack-data', 'data': json.dumps(processed_data)}))
+                                await asyncio.sleep(0) # Needed to have continuous data flow
                                 data = bytearray(0)
                 except websockets.ConnectionClosedError:
                     continue
