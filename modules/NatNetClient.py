@@ -751,11 +751,14 @@ class NatNetClient:
     # Unpack data from a motion capture frame message
     def __unpack_mocap_data( self, data : bytes, packet_size, major, minor):
         def makeDataReadyForWebsocket(data):
+            # The division in marker data and rigid body data is done to make the data easier to manage and easier to modify in the future
+            # It's indeed important to underline that some of the informations in the rigid body data are also present in the marker data
+
             # If the rigidbody filter is off return everything
             if RIGIDBODY_FILTER_ON == False:
                 return data
             
-            # Get labeled marker data
+            # Get marker data
             return_data = []
             markers = data.get_marker_set_data().get_labeled_data()
             for markerSet in markers:
@@ -1317,8 +1320,10 @@ class NatNetClient:
                             if len( data ) > 0 :
                                 processed_data = self.__process_message( data )
                                 await websocket.send(json.dumps({'type': 'optitrack-data', 'data': json.dumps(processed_data)}))
-                                await asyncio.sleep(0) # Needed to have continuous data flow
+                                await asyncio.sleep(0)
                                 data = bytearray(0)
+                except websockets.ConnectionClosedOK:
+                    continue
                 except websockets.ConnectionClosedError:
                     continue
                 except websockets.InvalidStatusCode as e: # This is to handle when the server is not turned on
