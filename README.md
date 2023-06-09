@@ -26,8 +26,8 @@ venv\Scripts\activate # Windows
 pip install -r requirements.txt
 ```
 Before running the <code>main.py</code> file it's important that you verify that:
-- You are in the same network of the Optitrack system which you want to stream informations from (currently you should be connected with the ZeroTier VPN).
-- On the Optitrack system the streaming of data is turned on (you can find a screenshot of the configuration in the <b>OptiTrack server configuration</b> section)
+- You are in the same network of the Optitrack system which you want to stream informations from (currently you can do this with ZeroTier VPN).
+- On the Optitrack system the streaming of data is turned on (you can find a screenshot of the configuration in the <b>Motive server configuration</b> section)
 - You have set up the parameters in the <code>modules/settings.py</code> file (such as the client address, the server addres, ...)
 - The websocket server is up and running. If the websocket is turned off the bridge will start but it will turn off very shortly. If the connection between the websocket server and the OptiTrack bridge is lost the bridge will try to reconnect to the websocket server. The number of reconnection attempts is set in the <code>modules/settings.py</code> file.
 
@@ -43,9 +43,9 @@ In this case the code has been adapted to send only few specific data.
 - The bridge apply a filter on the input data and send only the informations relative to specific rigid bodies to the websocket server. <br>
 If you wish to remove this filter or you wish to modify the filtered rigidbody please modify the <code>settings.py</code> file.
 
-## OptiTrack server configuration
-Below you can find the screenshoot of the a sample OptiTrack server configuration. <br>
-[STILL TO DO]
+## Motive server configuration
+Below you can find the screenshoot of the a sample NatNet server configuration on Motive. <br>
+![Alt Text](readme-files/motive-server.png)
 
 ## Third party libraries
 The only third party library that is used in the code (other than the modules in <code>requirements.txt</code>) is [NatNet SDK for Python v.4.0.0](https://optitrack.com/support/downloads/developer-tools.html).
