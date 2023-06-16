@@ -86,7 +86,6 @@ class NatNetClient:
     # Costructor of the class
     def __init__( self ):
         self.logger = logger(log_on_stout = LOGGING_ON_STDOUT)
-
         # Verify that the connection is working
         if(self.check_connection() == False):
             self.logger.error("ERROR: No internet connection. Please connect to internet and try again.")
@@ -1274,7 +1273,7 @@ class NatNetClient:
         # Shut down everything
         self.set_shutdown()
 
-    async def __data_thread_function( self, in_socket, stop):
+    async def __data_thread_function(self, in_socket, stop):
         try:
             # Define the data buffer
             data=bytearray(0)
@@ -1346,7 +1345,7 @@ class NatNetClient:
         except KeyboardInterrupt:
             return 0
         except Exception as e:
-            self.logger("Error: " + str(e))
+            self.logger.error("Error: " + str(e))
             return 1
 
     def __process_message( self, data : bytes):
